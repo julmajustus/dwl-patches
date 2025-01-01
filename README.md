@@ -61,6 +61,23 @@ When a new client appears:
 
 ---
 
+# Configuring btrtile
+
+btrtile adds couple variables to config.h to fine tune the mouse resizing of tiled clients.
+
+1. **resize_factor**
+	- A multiplier to transfer pointer movement to client weight ratio. Depends heavily on mouse sensivity.
+      Defaults to 0.0002f.
+
+2. **resize_interval_ms**
+	- A time based resize call limiter. Depends on framerate and screen refresh rate. 
+      Defaults to 16ms. (~60 resize updates per second)
+
+Fine tune these values to find the best values for your setup, smoother resizing can significally increase cpu overhead.
+If mouse resizing feels sluggish, you can try compiling dwl with more aggressive optimization flags like -O2/-O3. 
+
+---
+
 # Patch recommendations
 
 1. **Patches that I use with my btrtile**
