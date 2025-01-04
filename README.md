@@ -102,19 +102,42 @@ If mouse resizing feels sluggish, you can try compiling dwl with more aggressive
 
 # simple_scratchpad — A very simple scratchpad utility.
 
-   Adds functions to add, toggle and remove clients to/from scratchpad.
+   Adds functions to add, toggle and remove clients to/from scratchpad client list.
 ![scratchpad in action](./demos/simple_scratchpad_demo.gif)
   
 ---
 
-1. **Add**
+1. **addscratchpad**
   - Floats client and adds it to scratchpad clients list.
 
-2. **Toggle**
-  - Shows or hides the scratchpad clients.
+2. **togglescratchpad**
+  - Shows or hides the clients in scratchpad client list.
 
-2. **Remove**
+3. **removescratchpad**
   - Removes client from scratchpad client list.
+  
+---
+
+# fullscreenadaptivesync — Enables adaptive sync/VRR when a client is fullscreen.
+
+Adds a function that automatically enables adaptive sync/VRR when a fullscreen client is detected, and disables it once the client exits fullscreen.
+  
+---
+
+1. **Why**
+  - Some VRR implementations can introduce distracting flickering when the display’s refresh rate is synced with the application’s framerate. While VRR is useful for some applications (especially fullscreen games), this patch automates the toggling of VRR whenever a client enters or exits fullscreen.
+
+2. **Requirements**
+  - A FreeSync/G-Sync capable monitor
+  - GPU/driver support for adaptive sync
+
+3. **How it works**
+  - When a client enters fullscreen, adaptive sync is automatically enabled.
+  - When the client exits fullscreen, adaptive sync is disabled again.
+
+4. **togglefullscreenadaptivesync**
+  - Adds a switch to enable or disable the fullscreenadaptivesync behavior.  
+  - Enabled by default.
   
 ---
 
