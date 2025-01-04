@@ -1,13 +1,13 @@
-From 9739ab5d1e02102f0c2dc34481b4eb3de11ce360 Mon Sep 17 00:00:00 2001
+From a8d29e03f565b54a68c6c2cb2da103366c627825 Mon Sep 17 00:00:00 2001
 From: julmajustus <julmajustus@tutanota.com>
 Date: Sat, 4 Jan 2025 13:22:12 +0200
 Subject: [PATCH] add simple_scratchpad
 
 ---
- config.def.h        |  3 +++
+ config.def.h        |  3 ++
  dwl.c               | 34 +++++++++++++++++++++--
- simple_scratchpad.c | 66 +++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 101 insertions(+), 2 deletions(-)
+ simple_scratchpad.c | 67 +++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 102 insertions(+), 2 deletions(-)
  create mode 100644 simple_scratchpad.c
 
 diff --git a/config.def.h b/config.def.h
@@ -134,10 +134,10 @@ index a2711f6..85f4a51 100644
  	LISTEN_STATIC(&xdg_shell->events.new_toplevel, createnotify);
 diff --git a/simple_scratchpad.c b/simple_scratchpad.c
 new file mode 100644
-index 0000000..bf10e01
+index 0000000..381f4b5
 --- /dev/null
 +++ b/simple_scratchpad.c
-@@ -0,0 +1,66 @@
+@@ -0,0 +1,67 @@
 +/* ************************************************************************** */
 +/*                                                                            */
 +/*                                                        :::      ::::::::   */
@@ -146,7 +146,7 @@ index 0000000..bf10e01
 +/*   By: jmakkone <jmakkone@student.hive.fi>        +#+  +:+       +#+        */
 +/*                                                +#+#+#+#+#+   +#+           */
 +/*   Created: 2024/12/19 19:35:02 by jmakkone          #+#    #+#             */
-+/*   Updated: 2025/01/04 04:27:26 by jmakkone         ###   ########.fr       */
++/*   Updated: 2025/01/04 13:35:50 by jmakkone         ###   ########.fr       */
 +/*                                                                            */
 +/* ************************************************************************** */
 +
@@ -157,6 +157,7 @@ index 0000000..bf10e01
 +
 +	if (!c)
 +		return;
++	/* Check if the added client is already a scratchpad client */
 +	wl_list_for_each(cc, &scratchpad_clients, link_temp) {
 +		if (cc == c)
 +			return;
