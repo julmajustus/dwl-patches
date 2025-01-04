@@ -1,5 +1,5 @@
 # dwl-patches
-My personal patches for dwl
+Patches that I've made for dwl
 
 # btrtile — A Focus-Driven Tiling Layout for dwl
 
@@ -26,8 +26,8 @@ While dwl’s patches folder is full of different layouts, I couldn't find suita
   - By default, new splits are 50/50.
 
 - **Adaptive Splitting**  
-  - If the area to be split is wider than its height, btrtile does a horizontal split.  
-  - Otherwise, it does a vertical split.
+  - If the area to be split is wider than its height, btrtile does a vertical split.  
+  - Otherwise, it does a horizontal split.
 
 - **Keyboard and Mouse Driven**  
   - Supports keyboard-based commands for quick ratio adjustments and client swapping.  
@@ -66,14 +66,14 @@ When a new client appears:
 btrtile adds couple variables to config.h to fine tune the mouse resizing of tiled clients.
 
 1. **resize_factor**
-	- A multiplier to transfer pointer movement to client weight ratio. Depends heavily on mouse sensivity.
+	- A multiplier to transfer pointer movement to client weight ratio. Depends heavily on mouse sensivity.  
       Defaults to 0.0002f.
 
 2. **resize_interval_ms**
-	- A time based resize call limiter. Depends on framerate and screen refresh rate. 
+	- A time based resize call limiter. Depends on framerate and screen refresh rate.   
       Defaults to 16ms. (~60 resize updates per second)
 
-Fine tune these values to find the best values for your setup, smoother resizing can significally increase cpu overhead.
+Fine tune these values to find the best values for your setup, smoother resizing can significally increase cpu overhead.  
 If mouse resizing feels sluggish, you can try compiling dwl with more aggressive optimization flags like -O2/-O3. 
 
 ---
@@ -82,19 +82,19 @@ If mouse resizing feels sluggish, you can try compiling dwl with more aggressive
 
 1. **Patches that I use with my btrtile**
      
-   - [focusdir](https://codeberg.org/dwl/dwl-patches/src/branch/main/patches/focusdir)
+   - [focusdir](https://codeberg.org/dwl/dwl-patches/src/branch/main/patches/focusdir)  
      Great patch to move focus between clients.
 
-   - [rotatetags](https://codeberg.org/dwl/dwl-patches/src/branch/main/patches/rotatetags)
+   - [rotatetags](https://codeberg.org/dwl/dwl-patches/src/branch/main/patches/rotatetags)  
      Good patch to rotate the view or shift clients between tags.
 
-   - [warpcursor](https://codeberg.org/dwl/dwl-patches/src/branch/main/patches/warpcursor)
+   - [warpcursor](https://codeberg.org/dwl/dwl-patches/src/branch/main/patches/warpcursor)  
      Moves cursor location to focused client.
 
-   - [pertag](https://codeberg.org/dwl/dwl-patches/src/branch/main/patches/pertag)
+   - [pertag](https://codeberg.org/dwl/dwl-patches/src/branch/main/patches/pertag)  
      Allows each tag to have individual layout setups.
 
-   - [gaps](https://codeberg.org/dwl/dwl-patches/src/branch/main/patches/gaps)
+   - [gaps](https://codeberg.org/dwl/dwl-patches/src/branch/main/patches/gaps)  
      Add gaps between clients.
 
 ---
