@@ -1,21 +1,21 @@
-From 6d60b3cd6eb4d08f8566e80141071bd33d231c59 Mon Sep 17 00:00:00 2001
+From d56f0b61d6b611a977c065d0834f76b42c0aa038 Mon Sep 17 00:00:00 2001
 From: julmajustus <julmajustus@tutanota.com>
-Date: Wed, 1 Jan 2025 19:08:45 +0200
-Subject: [PATCH] btrtile-gapps init
+Date: Sat, 8 Feb 2025 05:41:12 +0200
+Subject: [PATCH] btrtile-gaps init
 
 ---
- btrtile.c    | 679 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ btrtile.c    | 716 +++++++++++++++++++++++++++++++++++++++++++++++++++
  config.def.h |  12 +
- dwl.c        | 177 ++++++++++++--
- 3 files changed, 841 insertions(+), 27 deletions(-)
+ dwl.c        | 173 +++++++++++--
+ 3 files changed, 874 insertions(+), 27 deletions(-)
  create mode 100644 btrtile.c
 
 diff --git a/btrtile.c b/btrtile.c
 new file mode 100644
-index 0000000..dea8a8c
+index 0000000..3ff3e20
 --- /dev/null
 +++ b/btrtile.c
-@@ -0,0 +1,679 @@
+@@ -0,0 +1,716 @@
 +/* ************************************************************************** */
 +/*                                                                            */
 +/*                                                        :::      ::::::::   */
@@ -24,7 +24,7 @@ index 0000000..dea8a8c
 +/*   By: jmakkone <jmakkone@student.hive.fi>        +#+  +:+       +#+        */
 +/*                                                +#+#+#+#+#+   +#+           */
 +/*   Created: 2024/12/15 00:26:07 by jmakkone          #+#    #+#             */
-+/*   Updated: 2025/01/01 17:26:52 by jmakkone         ###   ########.fr       */
++/*   Updated: 2025/02/08 04:52:00 by jmakkone         ###   ########.fr       */
 +/*                                                                            */
 +/* ************************************************************************** */
 +
@@ -77,6 +77,7 @@ index 0000000..dea8a8c
 +static void setratio_h(const Arg *arg);
 +static void setratio_v(const Arg *arg);
 +static void swapclients(const Arg *arg);
++static Client *xytoclient(double x, double y, uint32_t tag);
 +
 +static int resizing_from_mouse = 0;
 +static double resize_last_update_x, resize_last_update_y;
@@ -166,16 +167,8 @@ index 0000000..dea8a8c
 +	root_ptr = &m->tree_layout->root[curtag];
 +	tiled_clients = &m->tree_layout->tiled_clients[curtag];
 +	wl_list_for_each_reverse(c, &clients, link) {
-+		if (VISIBLEON(c, m) && !c->isfloating && !c->isfullscreen) {
++		if (VISIBLEON(c, m) && !c->isfloating && !c->isfullscreen)
 +			n++;
-+			if (!focused_client &&
-+				cursor->x >= c->old_geom.x
-+				&& cursor->x < c->old_geom.x + c->old_geom.width
-+				&& cursor->y >= c->old_geom.y
-+				&& cursor->y < c->old_geom.y + c->old_geom.height) {
-+				focused_client = c;
-+			}
-+		}
 +	}
 +
 +	/* If no visible clients, clear the node tree and tiled_clients list. */
@@ -186,6 +179,7 @@ index 0000000..dea8a8c
 +		return;
 +	}
 +
++	focused_client = xytoclient(cursor->x, cursor->y, curtag);
 +	/* If no focused client found, pick the first visible */
 +	if (!focused_client) {
 +		wl_list_for_each_reverse(c, &clients, link) {
@@ -217,6 +211,11 @@ index 0000000..dea8a8c
 +			}
 +			if (!found) {
 +				insert_client(m, focused_client, c, root_ptr, tiled_clients);
++				/* Recursion failsafe to handle inserted clients individually
++				 * if a batch of new clients is added. */
++				apply_layout(m, *root_ptr, full_area, 1);
++				btrtile(m);
++				return;
 +			}
 +			wl_list_insert(&current_clients, &c->link_temp);
 +		}
@@ -226,7 +225,7 @@ index 0000000..dea8a8c
 +	 * clients that no longer exist on the current tag.
 +	 * This handles cases where user moves clients to other tags.
 +	 * When client is closed or killed we manage the list and tree clean up in
-+	 * destroynotify */
++	 * destroynotify. */
 +	wl_list_for_each_safe(cc, tmp, tiled_clients, link_tiled) {
 +		found = 0;
 +		wl_list_for_each(cur, &current_clients, link_temp) {
@@ -235,9 +234,8 @@ index 0000000..dea8a8c
 +				break;
 +			}
 +		}
-+		if (!found) {
++		if (!found)
 +			remove_client(m, cc, root_ptr, tiled_clients);
-+		}
 +	}
 +
 +	/* Rebuild the updated client list */
@@ -272,6 +270,7 @@ index 0000000..dea8a8c
 +	if (!node)
 +		return NULL;
 +	node->is_client_node = 0;
++	node->split_ratio = 0.5f;
 +	node->split_vertically = split_vertically;
 +	node->left = left;
 +	node->right = right;
@@ -477,52 +476,53 @@ index 0000000..dea8a8c
 +	unsigned int wider;
 +
 +	/* If there is no root node, inserted client must be the first one.
-+	 * If there's no focused client or client node cannot be found for the
-+	 * focused client we treat them as root node.*/
++	 * If there's no focused client we treat the inserted client as a new root node.*/
 +	if (!*root) {
 +		*root = create_client_node(new_client);
 +		add_client_to_tiled_list(new_client, tiled_clients);
-+	} else if (!focused || !(client_node = find_client_node(*root, focused))) {
++		return;
++	}
++	if (!focused || !(client_node = find_client_node(*root, focused))) {
 +		old_root = *root;
 +		*root = create_split_node(1, old_root, create_client_node(new_client));
 +		add_client_to_tiled_list(new_client, tiled_clients);
-+	} else {
-+		/* We check the cursor location on splittable area and choose
++		return;
++	}
++	/* We check the cursor location on splittable area and choose
 +		 * the new client's position. On horizontal splits left node represent
 +		 * the upper node and vice versa.*/
-+		mid_x = focused->old_geom.x + focused->old_geom.width / 2;
-+		mid_y = focused->old_geom.y + focused->old_geom.height / 2;
-+		old_client_node = create_client_node(client_node->client);
-+		new_client_node = create_client_node(new_client);
++	mid_x = focused->old_geom.x + focused->old_geom.width / 2;
++	mid_y = focused->old_geom.y + focused->old_geom.height / 2;
++	old_client_node = create_client_node(client_node->client);
++	new_client_node = create_client_node(new_client);
 +
-+		wider = focused->old_geom.width >= focused->old_geom.height;
-+		if (wider) {
-+			/* Vertical split */
-+			client_node->split_vertically = 1;
-+			if (cursor->x < mid_x) {
-+				client_node->left = new_client_node;
-+				client_node->right = old_client_node;
-+			} else {
-+				client_node->left = old_client_node;
-+				client_node->right = new_client_node;
-+			}
++	wider = focused->old_geom.width >= focused->old_geom.height;
++	if (wider) {
++		/* Vertical split */
++		client_node->split_vertically = 1;
++		if (cursor->x <= mid_x) {
++			client_node->left = new_client_node;
++			client_node->right = old_client_node;
 +		} else {
-+			/* Horizontal split */
-+			client_node->split_vertically = 0;
-+			if (cursor->y < mid_y) {
-+				client_node->left = new_client_node;
-+				client_node->right = old_client_node;
-+			} else {
-+				client_node->left = old_client_node;
-+				client_node->right = new_client_node;
-+			}
++			client_node->left = old_client_node;
++			client_node->right = new_client_node;
 +		}
-+		/* The old client node becomes the splitnode for the old and new client
-+		 * nodes.*/
-+		client_node->is_client_node = 0;
-+		client_node->client = NULL;
-+		add_client_to_tiled_list(new_client, tiled_clients);
++	} else {
++		/* Horizontal split */
++		client_node->split_vertically = 0;
++		if (cursor->y <= mid_y) {
++			client_node->left = new_client_node;
++			client_node->right = old_client_node;
++		} else {
++			client_node->left = old_client_node;
++			client_node->right = new_client_node;
++		}
 +	}
++	/* The old client node becomes the splitnode for the old and new client
++		 * nodes.*/
++	client_node->is_client_node = 0;
++	client_node->client = NULL;
++	add_client_to_tiled_list(new_client, tiled_clients);
 +}
 +
 +LayoutNode *
@@ -675,9 +675,8 @@ index 0000000..dea8a8c
 +	 * node if no suitable horizontal split node is found, default to vertical */
 +	if (dir == DIR_UP || dir == DIR_DOWN) {
 +		split_node = find_suitable_split_node(client_node, 0);
-+		if (!split_node) {
++		if (!split_node)
 +			return;
-+		}
 +	} else {
 +		split_node = selmon->tree_layout->root[curtag];
 +	}
@@ -694,6 +693,44 @@ index 0000000..dea8a8c
 +
 +		arrange(selmon);
 +	}
++}
++
++Client *
++xytoclient(double x, double y, uint32_t tag) {
++	Client *c, *closest = NULL;
++	double dist, mindist = INT_MAX, dx, dy;
++
++	wl_list_for_each_reverse(c, &selmon->tree_layout->tiled_clients[tag], link_tiled) {
++		if (VISIBLEON(c, selmon) && !c->isfloating && !c->isfullscreen &&
++			x >= c->geom.x && x <= (c->geom.x + c->geom.width) &&
++			y >= c->geom.y && y <= (c->geom.y + c->geom.height)){
++			return c;
++		}
++	}
++
++	/* If no client was found at cursor position fallback to closest. */
++	wl_list_for_each_reverse(c, &selmon->tree_layout->tiled_clients[tag], link_tiled) {
++		if (VISIBLEON(c, selmon) && !c->isfloating && !c->isfullscreen) {
++			dx = 0, dy = 0;
++
++			if (x < c->geom.x)
++				dx = c->geom.x - x;
++			else if (x > (c->geom.x + c->geom.width))
++				dx = x - (c->geom.x + c->geom.width);
++
++			if (y < c->geom.y)
++				dy = c->geom.y - y;
++			else if (y > (c->geom.y + c->geom.height))
++				dy = y - (c->geom.y + c->geom.height);
++
++			dist = sqrt(dx * dx + dy * dy);
++			if (dist < mindist) {
++				mindist = dist;
++				closest = c;
++			}
++		}
++	}
++	return closest;
 +}
 diff --git a/config.def.h b/config.def.h
 index 22d2171..92f3ad6 100644
@@ -734,7 +771,7 @@ index 22d2171..92f3ad6 100644
  	TAGKEYS(          XKB_KEY_2, XKB_KEY_at,                         1),
  	TAGKEYS(          XKB_KEY_3, XKB_KEY_numbersign,                 2),
 diff --git a/dwl.c b/dwl.c
-index def2562..604a9a4 100644
+index a2711f6..7682366 100644
 --- a/dwl.c
 +++ b/dwl.c
 @@ -1,6 +1,7 @@
@@ -800,18 +837,16 @@ index def2562..604a9a4 100644
  
  /* function implementations */
  void
-@@ -600,10 +611,17 @@ buttonpress(struct wl_listener *listener, void *data)
+@@ -600,10 +611,15 @@ buttonpress(struct wl_listener *listener, void *data)
  {
  	struct wlr_pointer_button_event *event = data;
  	struct wlr_keyboard *keyboard;
 -	uint32_t mods;
 -	Client *c;
 +	struct wl_list *tiled_clients;
-+	struct wlr_surface *surface;
-+	double sx, sy;
 +	LayoutNode **root, *old_root;
 +	uint32_t mods, curtag, active_tags = selmon->tagset[selmon->seltags];
-+	Client *c, *target;
++	Client *c, *target = NULL;
  	const Button *b;
  
 +	curtag = get_current_tag(selmon);
@@ -820,7 +855,7 @@ index def2562..604a9a4 100644
  	wlr_idle_notifier_v1_notify_activity(idle_notifier, seat);
  
  	switch (event->state) {
-@@ -632,15 +650,49 @@ buttonpress(struct wl_listener *listener, void *data)
+@@ -632,15 +648,47 @@ buttonpress(struct wl_listener *listener, void *data)
  		/* If you released any buttons, we exit interactive move/resize mode. */
  		/* TODO should reset to the pointer focus's current setcursor */
  		if (!locked && cursor_mode != CurNormal && cursor_mode != CurPressed) {
@@ -830,9 +865,7 @@ index def2562..604a9a4 100644
 +				if (active_tags && (active_tags & (active_tags - 1)))
 +					break;
 +				if (cursor_mode == CurMove && c->isfloating) {
-+					target = NULL;
-+					surface = NULL;
-+					xytonode(cursor->x, cursor->y, &surface, &target, NULL, &sx, &sy);
++					target = xytoclient(cursor->x, cursor->y, curtag);
 +
 +					if (target && !target->isfloating && !target->isfullscreen) {
 +						insert_client(selmon, target, c, root, tiled_clients);
@@ -872,7 +905,7 @@ index def2562..604a9a4 100644
  		break;
  	}
  	/* If the event wasn't handled by the compositor, notify the client with
-@@ -720,6 +772,9 @@ cleanupmon(struct wl_listener *listener, void *data)
+@@ -720,6 +768,9 @@ cleanupmon(struct wl_listener *listener, void *data)
  	wlr_output_layout_remove(output_layout, m->wlr_output);
  	wlr_scene_output_destroy(m->scene_output);
  
@@ -882,7 +915,7 @@ index def2562..604a9a4 100644
  	closemon(m);
  	wlr_scene_node_destroy(&m->fullscreen_bg->node);
  	free(m);
-@@ -1026,6 +1081,7 @@ createmon(struct wl_listener *listener, void *data)
+@@ -1024,6 +1075,7 @@ createmon(struct wl_listener *listener, void *data)
  
  	wl_list_insert(&mons, &m->link);
  	printstatus();
@@ -890,7 +923,7 @@ index def2562..604a9a4 100644
  
  	/* The xdg-protocol specifies:
  	 *
-@@ -1265,6 +1321,15 @@ destroynotify(struct wl_listener *listener, void *data)
+@@ -1263,6 +1315,15 @@ destroynotify(struct wl_listener *listener, void *data)
  	wl_list_remove(&c->destroy.link);
  	wl_list_remove(&c->set_title.link);
  	wl_list_remove(&c->fullscreen.link);
@@ -906,7 +939,7 @@ index def2562..604a9a4 100644
  #ifdef XWAYLAND
  	if (c->type != XDGShell) {
  		wl_list_remove(&c->activate.link);
-@@ -1811,7 +1876,8 @@ void
+@@ -1809,7 +1870,8 @@ void
  motionnotify(uint32_t time, struct wlr_input_device *device, double dx, double dy,
  		double dx_unaccel, double dy_unaccel)
  {
@@ -916,7 +949,7 @@ index def2562..604a9a4 100644
  	Client *c = NULL, *w = NULL;
  	LayerSurface *l = NULL;
  	struct wlr_surface *surface = NULL;
-@@ -1865,18 +1931,56 @@ motionnotify(uint32_t time, struct wlr_input_device *device, double dx, double d
+@@ -1863,18 +1925,56 @@ motionnotify(uint32_t time, struct wlr_input_device *device, double dx, double d
  	/* Update drag icon's position */
  	wlr_scene_node_set_position(&drag_icon->node, (int)round(cursor->x), (int)round(cursor->y));
  
@@ -980,7 +1013,7 @@ index def2562..604a9a4 100644
  	/* If there's no client surface under the cursor, set the cursor image to a
  	 * default. This is what makes the cursor image appear when you move it
  	 * off of a client or over its border. */
-@@ -1910,22 +2014,41 @@ moveresize(const Arg *arg)
+@@ -1908,22 +2008,41 @@ moveresize(const Arg *arg)
  	if (!grabc || client_is_unmanaged(grabc) || grabc->isfullscreen)
  		return;
  
@@ -1037,5 +1070,5 @@ index def2562..604a9a4 100644
  }
  
 -- 
-2.45.2
+2.45.3
 

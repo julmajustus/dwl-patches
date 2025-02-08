@@ -1,5 +1,9 @@
 # dwl-patches
 Patches that I've made for dwl
+ - [btrtile](https://codeberg.org/dwl/dwl-patches/src/branch/main/patches/btrtile)
+ - [simple_scratchpad](https://codeberg.org/dwl/dwl-patches/src/branch/main/patches/simple_scratchpad)
+ - [fullscreenadaptivesync](https://codeberg.org/dwl/dwl-patches/src/branch/main/patches/fullscreenadaptivesync)
+
 
 # btrtile — A Focus-Driven Tiling Layout for dwl
 
@@ -9,13 +13,13 @@ btrtile is a dynamic tiling layout patch designed for the [dwl](https://codeberg
 
 ---
 
-# Why btrtile
+### Why btrtile
 
 While dwl’s patches folder is full of different layouts, I couldn't find suitable layout that would work well with my workflow and single ultrawide monitor setup. Btrtile aims to solve that by introducing a layout strategy that splits clients according to user focus and pointer position.
 
 ---
 
-# Features
+### Features
 
 - **Combined Tiling and Management**  
   Combines tiling layout and management of clients under one patchset.
@@ -35,7 +39,7 @@ While dwl’s patches folder is full of different layouts, I couldn't find suita
 
 ---
 
-# How It Works
+### How It Works
 
 btrtile organizes clients using a binary tree data structure that represents splits either vertically or horizontally.
 
@@ -50,7 +54,7 @@ When a new client appears:
 
 ---
 
-# What It Doesn’t Handle
+### What It Doesn’t Handle
 
 - **Multi-Tag client Management**  
   btrtile intentionally reverts clients to a single tag if they span multiple tags. This prevents potential inconsistencies or duplicate entries in its per-tag client tree.  
@@ -61,7 +65,7 @@ When a new client appears:
 
 ---
 
-# Configuring btrtile
+### Configuring btrtile
 
 btrtile adds couple variables to config.h to fine tune the mouse resizing of tiled clients.
 
@@ -78,7 +82,7 @@ If mouse resizing feels sluggish, you can try compiling dwl with more aggressive
 
 ---
 
-# Patch recommendations
+### Patch recommendations
 
 1. **Patches that I use with my btrtile**
      
@@ -141,10 +145,13 @@ Adds a function that automatically enables adaptive sync/VRR when a fullscreen c
   
 ---
 
-# Applying the patch
+# Applying the patches
 
    - Patches are built agains release version 0.7. Tho they should work agains the developement branch with non or minor modifications.
+   - git am -3 patchname.patch
+   or
    - patch -p1 < patchname.patch inside your local dwl directory.
+
 
 
 
