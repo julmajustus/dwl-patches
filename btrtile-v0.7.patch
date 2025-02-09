@@ -1,4 +1,4 @@
-From e73fdffcc2bd4af301f4cebc9f665f0675190b85 Mon Sep 17 00:00:00 2001
+From e6beff6279773f3dec87dc4a2aedd15304a040f0 Mon Sep 17 00:00:00 2001
 From: julmajustus <julmajustus@tutanota.com>
 Date: Sat, 8 Feb 2025 04:54:14 +0200
 Subject: [PATCH] btrtile init
@@ -6,8 +6,8 @@ Subject: [PATCH] btrtile init
 ---
  btrtile.c    | 696 +++++++++++++++++++++++++++++++++++++++++++++++++++
  config.def.h |  12 +
- dwl.c        | 173 +++++++++++--
- 3 files changed, 854 insertions(+), 27 deletions(-)
+ dwl.c        | 223 +++++++++++++----
+ 3 files changed, 876 insertions(+), 55 deletions(-)
  create mode 100644 btrtile.c
 
 diff --git a/btrtile.c b/btrtile.c
@@ -751,7 +751,7 @@ index 22d2171..92f3ad6 100644
  	TAGKEYS(          XKB_KEY_2, XKB_KEY_at,                         1),
  	TAGKEYS(          XKB_KEY_3, XKB_KEY_numbersign,                 2),
 diff --git a/dwl.c b/dwl.c
-index a2711f6..7682366 100644
+index a2711f6..c7f097d 100644
 --- a/dwl.c
 +++ b/dwl.c
 @@ -1,6 +1,7 @@
@@ -817,14 +817,14 @@ index a2711f6..7682366 100644
  
  /* function implementations */
  void
-@@ -600,10 +611,15 @@ buttonpress(struct wl_listener *listener, void *data)
+@@ -600,53 +611,84 @@ buttonpress(struct wl_listener *listener, void *data)
  {
  	struct wlr_pointer_button_event *event = data;
  	struct wlr_keyboard *keyboard;
 -	uint32_t mods;
 -	Client *c;
 +	struct wl_list *tiled_clients;
-+	LayoutNode **root, *old_root;
++	LayoutNode **root;
 +	uint32_t mods, curtag, active_tags = selmon->tagset[selmon->seltags];
 +	Client *c, *target = NULL;
  	const Button *b;
@@ -835,57 +835,106 @@ index a2711f6..7682366 100644
  	wlr_idle_notifier_v1_notify_activity(idle_notifier, seat);
  
  	switch (event->state) {
-@@ -632,15 +648,47 @@ buttonpress(struct wl_listener *listener, void *data)
- 		/* If you released any buttons, we exit interactive move/resize mode. */
- 		/* TODO should reset to the pointer focus's current setcursor */
- 		if (!locked && cursor_mode != CurNormal && cursor_mode != CurPressed) {
-+			c = grabc;
-+			if (c && c->was_tiled && !strcmp(selmon->ltsymbol, "|w|")) {
-+				/* Check if more than one tag is active, if so we escape */
-+				if (active_tags && (active_tags & (active_tags - 1)))
-+					break;
-+				if (cursor_mode == CurMove && c->isfloating) {
-+					target = xytoclient(cursor->x, cursor->y, curtag);
+-	case WL_POINTER_BUTTON_STATE_PRESSED:
+-		cursor_mode = CurPressed;
+-		selmon = xytomon(cursor->x, cursor->y);
+-		if (locked)
+-			break;
++		case WL_POINTER_BUTTON_STATE_PRESSED:
++			cursor_mode = CurPressed;
++			selmon = xytomon(cursor->x, cursor->y);
++			if (locked)
++				break;
+ 
+-		/* Change focus if the button was _pressed_ over a client */
+-		xytonode(cursor->x, cursor->y, NULL, &c, NULL, NULL, NULL);
+-		if (c && (!client_is_unmanaged(c) || client_wants_focus(c)))
+-			focusclient(c, 1);
++			/* Change focus if the button was _pressed_ over a client */
++			xytonode(cursor->x, cursor->y, NULL, &c, NULL, NULL, NULL);
++			if (c && (!client_is_unmanaged(c) || client_wants_focus(c)))
++				focusclient(c, 1);
+ 
+-		keyboard = wlr_seat_get_keyboard(seat);
+-		mods = keyboard ? wlr_keyboard_get_modifiers(keyboard) : 0;
+-		for (b = buttons; b < END(buttons); b++) {
+-			if (CLEANMASK(mods) == CLEANMASK(b->mod) &&
++			keyboard = wlr_seat_get_keyboard(seat);
++			mods = keyboard ? wlr_keyboard_get_modifiers(keyboard) : 0;
++			for (b = buttons; b < END(buttons); b++) {
++				if (CLEANMASK(mods) == CLEANMASK(b->mod) &&
+ 					event->button == b->button && b->func) {
+-				b->func(&b->arg);
++					b->func(&b->arg);
++					return;
++				}
++			}
++			break;
++		case WL_POINTER_BUTTON_STATE_RELEASED:
++			/* If you released any buttons, we exit interactive move/resize mode. */
++			/* TODO should reset to the pointer focus's current setcursor */
++			if (!locked && cursor_mode != CurNormal && cursor_mode != CurPressed) {
++				c = grabc;
++				if (c && c->was_tiled && !strcmp(selmon->ltsymbol, "|w|")) {
++					/* Check if more than one tag is active, if so we escape */
++					if (active_tags && (active_tags & (active_tags - 1)))
++						break;
++					if (cursor_mode == CurMove && c->isfloating) {
++						target = xytoclient(cursor->x, cursor->y, curtag);
 +
-+					if (target && !target->isfloating && !target->isfullscreen) {
-+						insert_client(selmon, target, c, root, tiled_clients);
-+					} else {
-+						if (!root) {
++						if (target && !target->isfloating && !target->isfullscreen) {
++							insert_client(selmon, target, c, root, tiled_clients);
++						} else {
 +							*root = create_client_node(c);
 +							add_client_to_tiled_list(c, tiled_clients);
-+						} else {
-+							old_root = *root;
-+							*root = create_split_node(1, old_root, create_client_node(c));
-+							add_client_to_tiled_list(c, tiled_clients);
 +						}
++
++						setfloating(c, 0);
++						arrange(selmon);
++
++					} else if (cursor_mode == CurResize && !c->isfloating) {
++						resizing_from_mouse = 0;
 +					}
-+
-+					setfloating(c, 0);
-+					arrange(selmon);
-+
-+				} else if (cursor_mode == CurResize && !c->isfloating) {
-+					resizing_from_mouse = 0;
++				} else {
++					if (cursor_mode == CurResize && resizing_from_mouse)
++						resizing_from_mouse = 0;
 +				}
-+			} else {
-+				if (cursor_mode == CurResize && resizing_from_mouse)
-+					resizing_from_mouse = 0;
-+			}
-+			/* Default behaviour */
- 			wlr_cursor_set_xcursor(cursor, cursor_mgr, "default");
- 			cursor_mode = CurNormal;
- 			/* Drop the window off on its new monitor */
- 			selmon = xytomon(cursor->x, cursor->y);
- 			setmon(grabc, selmon, 0);
-+			grabc = NULL;
- 			return;
--		} else {
++				/* Default behaviour */
++				wlr_cursor_set_xcursor(cursor, cursor_mgr, "default");
++				cursor_mode = CurNormal;
++				/* Drop the window off on its new monitor */
++				selmon = xytomon(cursor->x, cursor->y);
++				setmon(grabc, selmon, 0);
++				grabc = NULL;
+ 				return;
+ 			}
+-		}
+-		break;
+-	case WL_POINTER_BUTTON_STATE_RELEASED:
+-		/* If you released any buttons, we exit interactive move/resize mode. */
+-		/* TODO should reset to the pointer focus's current setcursor */
+-		if (!locked && cursor_mode != CurNormal && cursor_mode != CurPressed) {
+-			wlr_cursor_set_xcursor(cursor, cursor_mgr, "default");
 -			cursor_mode = CurNormal;
- 		}
-+		cursor_mode = CurNormal;
- 		break;
+-			/* Drop the window off on its new monitor */
+-			selmon = xytomon(cursor->x, cursor->y);
+-			setmon(grabc, selmon, 0);
+-			return;
+-		} else {
+ 			cursor_mode = CurNormal;
+-		}
+-		break;
++			break;
  	}
  	/* If the event wasn't handled by the compositor, notify the client with
-@@ -720,6 +768,9 @@ cleanupmon(struct wl_listener *listener, void *data)
+ 	 * pointer focus that a button press has occurred */
+ 	wlr_seat_pointer_notify_button(seat,
+-			event->time_msec, event->button, event->state);
++								event->time_msec, event->button, event->state);
+ }
+ 
+ void
+@@ -720,6 +762,9 @@ cleanupmon(struct wl_listener *listener, void *data)
  	wlr_output_layout_remove(output_layout, m->wlr_output);
  	wlr_scene_output_destroy(m->scene_output);
  
@@ -895,7 +944,7 @@ index a2711f6..7682366 100644
  	closemon(m);
  	wlr_scene_node_destroy(&m->fullscreen_bg->node);
  	free(m);
-@@ -1024,6 +1075,7 @@ createmon(struct wl_listener *listener, void *data)
+@@ -1024,6 +1069,7 @@ createmon(struct wl_listener *listener, void *data)
  
  	wl_list_insert(&mons, &m->link);
  	printstatus();
@@ -903,7 +952,7 @@ index a2711f6..7682366 100644
  
  	/* The xdg-protocol specifies:
  	 *
-@@ -1263,6 +1315,15 @@ destroynotify(struct wl_listener *listener, void *data)
+@@ -1263,6 +1309,15 @@ destroynotify(struct wl_listener *listener, void *data)
  	wl_list_remove(&c->destroy.link);
  	wl_list_remove(&c->set_title.link);
  	wl_list_remove(&c->fullscreen.link);
@@ -919,7 +968,7 @@ index a2711f6..7682366 100644
  #ifdef XWAYLAND
  	if (c->type != XDGShell) {
  		wl_list_remove(&c->activate.link);
-@@ -1809,7 +1870,8 @@ void
+@@ -1809,7 +1864,8 @@ void
  motionnotify(uint32_t time, struct wlr_input_device *device, double dx, double dy,
  		double dx_unaccel, double dy_unaccel)
  {
@@ -929,7 +978,7 @@ index a2711f6..7682366 100644
  	Client *c = NULL, *w = NULL;
  	LayerSurface *l = NULL;
  	struct wlr_surface *surface = NULL;
-@@ -1863,18 +1925,56 @@ motionnotify(uint32_t time, struct wlr_input_device *device, double dx, double d
+@@ -1863,18 +1919,56 @@ motionnotify(uint32_t time, struct wlr_input_device *device, double dx, double d
  	/* Update drag icon's position */
  	wlr_scene_node_set_position(&drag_icon->node, (int)round(cursor->x), (int)round(cursor->y));
  
@@ -993,7 +1042,7 @@ index a2711f6..7682366 100644
  	/* If there's no client surface under the cursor, set the cursor image to a
  	 * default. This is what makes the cursor image appear when you move it
  	 * off of a client or over its border. */
-@@ -1908,22 +2008,41 @@ moveresize(const Arg *arg)
+@@ -1908,22 +2002,41 @@ moveresize(const Arg *arg)
  	if (!grabc || client_is_unmanaged(grabc) || grabc->isfullscreen)
  		return;
  
