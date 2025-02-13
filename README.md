@@ -56,10 +56,6 @@ When a new client appears:
 
 ### What It Doesn’t Handle
 
-- **Multi-Tag client Management**  
-  btrtile intentionally reverts clients to a single tag if they span multiple tags. This prevents potential inconsistencies or duplicate entries in its per-tag client tree.  
-  - If you attempt to place a single client on multiple tags while using the btrtile layout, btrtile will enforce a single-tag assignment to maintain stability.
-
 - **Suckless philosophy**
   - Yea, it's a bloat. I tried to hide the suck inside a single file as much I could. While this approach is not ideal, it's how it's at least for now.
 
